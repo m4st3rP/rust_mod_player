@@ -56,6 +56,32 @@ struct Song {
     patterns: Vec<Pattern>
 }
 
+struct Note {
+    sample_number: u8,
+    note_period: u16,
+    effect_command: u16
+}
+
+impl Note {
+    fn new(b1: u8, b2: u8, b3: u8, b4: u8) -> Note {
+        let mut sample_number = b1 & 0xF0;
+        sample_number |= (b3 & 0xF0) >> 4;
+
+        let mut note_period = u16::from(b2);
+        note_period |= u16::from(b1 & 0x0F) << 8;
+
+        let mut effect_command = u16::from(b4);
+        effect_command |= u16::from(b3 & 0x0F) << 8;
+
+        Note {
+            sample_number,
+            note_period,
+            effect_command
+        }
+
+    }
+}
+
 fn main() {
     let file = File::open("test.mod").expect("Could not find file."); // TODO temporary use only this file
     let mut buf_reader = BufReader::new(file); // TODO is a buffered reader even useful in this situation?
@@ -106,15 +132,15 @@ fn get_samples(file_vector: &[u8]) -> Vec<Sample> {
             length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_LENGTH_AMOUNT)),
             finetune: (get_bytes_from_file(&file_vector, SAMPLE_FINETUNE_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_FINETUNE_AMOUNT)[0] & 0x0F << 4) as i8 >> 4, // only lower 4 bits are relevant, mask the higher ones away just in case TODO check if this is correct
             volume: get_bytes_from_file(&file_vector, SAMPLE_VOLUME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_VOLUME_AMOUNT)[0],
-            repeat_point: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_POINT_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_POINT_AMOUNT)), // TODO check if endian order is correct
-            repeat_length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_LENGTH_AMOUNT)), // TODO check if endian order is correct
+            repeat_point: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_POINT_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_POINT_AMOUNT)),
+            repeat_length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_LENGTH_AMOUNT)),
         });
     }
     vec
 }
 
 // big endian
-fn calculate_u16_from_two_u8(vec: &[u8]) -> u16 { // TODO maybe add boolean for big or little endian
+fn calculate_u16_from_two_u8(vec: &[u8]) -> u16 {
     let mut ret = u16::from(vec[1]);
     ret <<= 8;
     ret |= u16::from(vec[0]);
