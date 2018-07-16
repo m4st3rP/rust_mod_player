@@ -103,20 +103,21 @@ fn get_samples(file_vector: &[u8]) -> Vec<Sample> {
     for i in 0..SAMPLE_AMOUNT {
         vec.push(Sample {
             name: get_string_from_file(&file_vector, SAMPLE_NAME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_NAME_AMOUNT),
-            length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_LENGTH_AMOUNT)), // TODO check if endian order is correct
+            length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_LENGTH_AMOUNT)),
             finetune: (get_bytes_from_file(&file_vector, SAMPLE_FINETUNE_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_FINETUNE_AMOUNT)[0] & 0x0F << 4) as i8 >> 4, // only lower 4 bits are relevant, mask the higher ones away just in case TODO check if this is correct
             volume: get_bytes_from_file(&file_vector, SAMPLE_VOLUME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_VOLUME_AMOUNT)[0],
-            repeat_point: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_POINT_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_POINT_AMOUNT)), // TODO check if endian order is correct,
-            repeat_length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_LENGTH_AMOUNT)), // TODO check if endian order is correct,
+            repeat_point: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_POINT_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_POINT_AMOUNT)), // TODO check if endian order is correct
+            repeat_length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_LENGTH_AMOUNT)), // TODO check if endian order is correct
         });
     }
     vec
 }
 
+// big endian
 fn calculate_u16_from_two_u8(vec: &[u8]) -> u16 { // TODO maybe add boolean for big or little endian
-    let mut ret = u16::from(vec[0]);
+    let mut ret = u16::from(vec[1]);
     ret <<= 8;
-    ret |= u16::from(vec[1]);
+    ret |= u16::from(vec[0]);
     ret
 }
 
