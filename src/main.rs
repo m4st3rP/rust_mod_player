@@ -14,7 +14,7 @@ const SONG_LABEL_START: usize = 1080;
 const SONG_LABEL_AMOUNT: usize = 4;
 
 const SAMPLE_AMOUNT: usize = 31;
-const PATTERN_AMOUNT: usize = 90; // TODO need to find out dynamically, goes up to 128, test file has 90
+const PATTERN_AMOUNT: usize = 90; // TODO need to find out dynamically, can go up to 128, test file has 90
 
 const SAMPLE_BYTE_AMOUNT: usize = 30;
 const SAMPLE_NAME_START: usize = 20;
@@ -68,18 +68,20 @@ fn main() {
 
     let song = Song {
         title: get_string_from_file(&file_vector, SONG_TITLE_START, SONG_TITLE_AMOUNT),
-        length: *get_bytes_from_file(&file_vector, SONG_LENGTH_START, SONG_LENGTH_AMOUNT).get(0).unwrap(),
-        special_byte: *get_bytes_from_file(&file_vector, SONG_SPECIAL_BYTE_START, SONG_SPECIAL_BYTE_AMOUNT).get(0).unwrap(),
+        length: get_bytes_from_file(&file_vector, SONG_LENGTH_START, SONG_LENGTH_AMOUNT)[0],
+        special_byte: get_bytes_from_file(&file_vector, SONG_SPECIAL_BYTE_START, SONG_SPECIAL_BYTE_AMOUNT)[0],
         pattern_positions: get_bytes_from_file(&file_vector, SONG_PATTERN_POSITIONS_START, SONG_PATTERN_POSITIONS_AMOUNT),
         label: get_string_from_file(&file_vector, SONG_LABEL_START, SONG_LABEL_AMOUNT),
         samples: get_samples(&file_vector),
         patterns: get_patterns(&file_vector)
     };
+
+    print_debug_info(&song, 0, 0, 0);
 }
 
 fn get_bytes_from_file(file_vector: &[u8], start: usize, amount: usize) -> Vec<u8> {
     let mut ret = Vec::new();
-    for i in start..=start+amount {
+    for i in start..start+amount {
         ret.push(match file_vector.get(i) {
             Some(t) => *t,
             None => panic!("Incorrect file at byte: {}", i)
@@ -101,20 +103,20 @@ fn get_samples(file_vector: &[u8]) -> Vec<Sample> {
     for i in 0..SAMPLE_AMOUNT {
         vec.push(Sample {
             name: get_string_from_file(&file_vector, SAMPLE_NAME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_NAME_AMOUNT),
-            length: calculate_u16_from_two_u8(get_bytes_from_file(&file_vector, SAMPLE_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_LENGTH_AMOUNT)), // TODO check if endian order is correct
-            finetune: (*get_bytes_from_file(&file_vector, SAMPLE_FINETUNE_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_FINETUNE_AMOUNT).get(0).unwrap() & 0x0F << 4) as i8 >> 4, // only lower 4 bits are relevant, mask the higher ones away just in case
-            volume: *get_bytes_from_file(&file_vector, SAMPLE_VOLUME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_VOLUME_AMOUNT).get(0).unwrap(),
-            repeat_point: calculate_u16_from_two_u8(get_bytes_from_file(&file_vector, SAMPLE_REPEAT_POINT_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_POINT_AMOUNT)), // TODO check if endian order is correct,
-            repeat_length: calculate_u16_from_two_u8(get_bytes_from_file(&file_vector, SAMPLE_REPEAT_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_LENGTH_AMOUNT)), // TODO check if endian order is correct,
+            length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_LENGTH_AMOUNT)), // TODO check if endian order is correct
+            finetune: (get_bytes_from_file(&file_vector, SAMPLE_FINETUNE_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_FINETUNE_AMOUNT)[0] & 0x0F << 4) as i8 >> 4, // only lower 4 bits are relevant, mask the higher ones away just in case TODO check if this is correct
+            volume: get_bytes_from_file(&file_vector, SAMPLE_VOLUME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_VOLUME_AMOUNT)[0],
+            repeat_point: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_POINT_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_POINT_AMOUNT)), // TODO check if endian order is correct,
+            repeat_length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_LENGTH_AMOUNT)), // TODO check if endian order is correct,
         });
     }
     vec
 }
 
-fn calculate_u16_from_two_u8(vec: Vec<u8>) -> u16 {
-    let mut ret = *vec.get(0).unwrap() as u16;
+fn calculate_u16_from_two_u8(vec: &[u8]) -> u16 { // TODO maybe add boolean for big or little endian
+    let mut ret = u16::from(vec[0]);
     ret <<= 8;
-    ret |= *vec.get(1).unwrap() as u16;
+    ret |= u16::from(vec[1]);
     ret
 }
 
@@ -126,4 +128,25 @@ fn get_patterns(file_vector: &[u8]) -> Vec<Pattern> {
         });
     }
     vec
+}
+
+fn print_debug_info(song: &Song, sample_index: usize, pattern_index: usize, pattern_byte: usize) {
+    println!("Song");
+    println!("Title: {}", song.title);
+    println!("Length: {}", song.length);
+    println!("Special Byte: {}", song.special_byte);
+    println!("Patter Positions Length: {}", song.pattern_positions.len());
+    println!("Label: {}", song.label);
+    println!("Samples Length: {}", song.samples.len());
+    println!("Patterns Length: {}", song.patterns.len());
+    println!();
+    println!("Sample");
+    println!("Name: {}", &song.samples[sample_index].name);
+    println!("Length: {}", &song.samples[sample_index].length);
+    println!("Finetune: {}", &song.samples[sample_index].finetune);
+    println!("Volume: {}", &song.samples[sample_index].volume);
+    println!("Repeat Point: {}", &song.samples[sample_index].repeat_point);
+    println!("Repeat Length: {}", &song.samples[sample_index].repeat_length);
+    println!();
+    println!("Pattern: {}", song.patterns[pattern_index].data[pattern_byte]);
 }
