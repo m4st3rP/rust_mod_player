@@ -1,0 +1,6 @@
+[package]
+name = "rust_mod_player"
+version = "0.1.0"
+authors = ["Philipp Schwarz <schwarz_philipp@hotmail.de>"]
+
+[dependencies]
