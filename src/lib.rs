@@ -100,6 +100,14 @@ pub mod song {
             println!("Samples Length: {}", self.samples.len());
             println!("Patterns Length: {}", self.patterns.len());
         }
+
+        pub fn get_patterns(&self) -> &Vec<Pattern> {
+            &self.patterns
+        }
+
+        pub fn get_pattern_positions(&self) -> &Vec<u8> {
+            &self.pattern_positions
+        }
     }
 
     fn get_samples(file_vector: &[u8]) -> Vec<Sample> {
@@ -206,6 +214,10 @@ pub mod song {
             pub fn print_debug_info(&self, pattern_byte: usize) {
                 println!("Pattern");
                 println!("Pattern: {}", self.data[pattern_byte]);
+            }
+
+            pub fn get_note(&self, i: usize) -> &Note {
+                &self.notes[i]
             }
         }
     }
@@ -383,7 +395,7 @@ pub mod song {
                 format!("Sample Number: {}, Note Period: {}, Effect Command: {}, Musical Note: {}", self.sample_number, self.note_period, self.effect_command, self.musical_note)
             }
 
-            fn get_frequency(&self) -> f64 {
+            pub fn get_frequency(&self) -> f64 {
                 self.frequency
             }
         }
