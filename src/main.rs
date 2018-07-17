@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
+use std::fmt;
 
 const SONG_TITLE_START: usize = 0;
 const SONG_TITLE_AMOUNT: usize = 20;
@@ -59,7 +60,54 @@ struct Song {
 struct Note {
     sample_number: u8,
     note_period: u16,
-    effect_command: u16
+    effect_command: u16,
+    musical_note: MusicalNotes
+}
+
+#[derive(Debug)] // so we can print the enum
+enum MusicalNotes {
+    C1,
+    Csharp1,
+    D1,
+    Dsharp1,
+    E1,
+    F1,
+    Fsharp1,
+    G1,
+    Gsharp1,
+    A1,
+    Asharp1,
+    B1,
+    C2,
+    Csharp2,
+    D2,
+    Dsharp2,
+    E2,
+    F2,
+    Fsharp2,
+    G2,
+    Gsharp2,
+    A2,
+    Asharp2,
+    B2,
+    C3,
+    Csharp3,
+    D3,
+    Dsharp3,
+    E3,
+    F3,
+    Fsharp3,
+    G3,
+    Gsharp3,
+    A3,
+    Asharp3,
+    B3
+}
+
+impl fmt::Display for MusicalNotes {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
 
 impl Note {
@@ -67,18 +115,62 @@ impl Note {
         let mut sample_number = b1 & 0xF0;
         sample_number |= (b3 & 0xF0) >> 4;
 
-        let mut note_period = u16::from(b2);
+        let mut note_period = u16::from(b2); // TODO check if this is correct
         note_period |= u16::from(b1 & 0x0F) << 8;
 
         let mut effect_command = u16::from(b4);
         effect_command |= u16::from(b3 & 0x0F) << 8;
 
+        let musical_note = match note_period {
+            856 => MusicalNotes::C1,
+            808 => MusicalNotes::Csharp1,
+            762 => MusicalNotes::D1,
+            720 => MusicalNotes::Dsharp1,
+            678 => MusicalNotes::E1,
+            640 => MusicalNotes::F1,
+            604 => MusicalNotes::Fsharp1,
+            570 => MusicalNotes::G1,
+            538 => MusicalNotes::Gsharp1,
+            508 => MusicalNotes::A1,
+            480 => MusicalNotes::Asharp1,
+            453 => MusicalNotes::B1,
+            428 => MusicalNotes::C2,
+            404 => MusicalNotes::Csharp2,
+            381 => MusicalNotes::D2,
+            360 => MusicalNotes::Dsharp2,
+            339 => MusicalNotes::E2,
+            320 => MusicalNotes::F2,
+            302 => MusicalNotes::Fsharp2,
+            285 => MusicalNotes::G2,
+            269 => MusicalNotes::Gsharp2,
+            254 => MusicalNotes::A2,
+            240 => MusicalNotes::Asharp2,
+            226 => MusicalNotes::B2,
+            214 => MusicalNotes::C3,
+            202 => MusicalNotes::Csharp3,
+            190 => MusicalNotes::D3,
+            180 => MusicalNotes::Dsharp3,
+            170 => MusicalNotes::E3,
+            160 => MusicalNotes::F3,
+            151 => MusicalNotes::Fsharp3,
+            143 => MusicalNotes::G3,
+            135 => MusicalNotes::Gsharp3,
+            127 => MusicalNotes::A3,
+            120 => MusicalNotes::Asharp3,
+            113 => MusicalNotes::B3,
+            _ => panic!("Musical note does not exist: {}", note_period)
+        };
+
         Note {
             sample_number,
             note_period,
-            effect_command
+            effect_command,
+            musical_note
         }
+    }
 
+    fn to_string(&self) -> String {
+        format!("Sample Number: {}, Note Period: {}, Effect Command: {}, Musical Note: {}", self.sample_number, self.note_period, self.effect_command, self.musical_note)
     }
 }
 
@@ -103,6 +195,10 @@ fn main() {
     };
 
     print_debug_info(&song, 0, 0, 0);
+
+    let note_number = 89;
+    let note = Note::new(song.patterns[note_number].data[0], song.patterns[note_number].data[1], song.patterns[note_number].data[2], song.patterns[note_number].data[3]);
+    println!("{}", note.to_string());
 }
 
 fn get_bytes_from_file(file_vector: &[u8], start: usize, amount: usize) -> Vec<u8> {
