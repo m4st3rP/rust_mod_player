@@ -184,12 +184,13 @@ pub mod song {
 
         impl Pattern {
             pub fn new(file_vector: &[u8], i: usize, max_pat: u8) -> Pattern {
-                let data = get_bytes_from_file(&file_vector, PATTERN_START+i*PATTERN_BYTE_AMOUNT, PATTERN_BYTE_AMOUNT); // TODO find out why we sometimes get 0 as note_period
+                // a pattern consists of 1024 bytes
+                let data = get_bytes_from_file(&file_vector, PATTERN_START+i*PATTERN_BYTE_AMOUNT, PATTERN_BYTE_AMOUNT);
                 let mut notes = Vec::new();
 
                 let mut i = 0;
                 loop {
-                    notes.push(Note::new(data[i], data[i+1], data[i+2], data[i+3]));
+                    notes.push(Note::new(data[i], data[i+1], data[i+2], data[i+3])); // TODO find out why we sometimes get 0 as note_period, maybe this is supposed to be like this?
                     i += 4;
                     if i >= PATTERN_BYTE_AMOUNT { // break out of the loop when we reached the end of data
                         break;
@@ -259,7 +260,8 @@ pub mod song {
             Gsharp3,
             A3,
             Asharp3,
-            B3
+            B3,
+            Quiet
         }
 
         impl fmt::Display for MusicalNotes {
@@ -322,7 +324,8 @@ pub mod song {
                     127 => MusicalNotes::A3,
                     120 => MusicalNotes::Asharp3,
                     113 => MusicalNotes::B3,
-                    _ => panic!("Musical note does not exist: {}", note_period)
+                    _   => MusicalNotes::Quiet
+                    //_ => panic!("Musical note does not exist: NP: {}, b1: {}, b2: {}, b3: {}, b4: {}", note_period, b1, b2, b3, b4)
                 };
 
                 let frequency = match musical_note {
@@ -361,7 +364,8 @@ pub mod song {
                     MusicalNotes::Gsharp3 => 207.652,
                     MusicalNotes::A3 => 220.0,
                     MusicalNotes::Asharp3 => 233.082,
-                    MusicalNotes::B3 => 246.942
+                    MusicalNotes::B3 => 246.942,
+                    MusicalNotes::Quiet => 0.0
                 };
 
                 Note {
