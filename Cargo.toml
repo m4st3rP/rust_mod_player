@@ -4,3 +4,8 @@ version = "0.1.0"
 authors = ["Philipp Schwarz <schwarz_philipp@hotmail.de>"]
 
 [dependencies]
+cpal = "0.8.2"
+
+[lib]
+name = "rust_mod"
+path = "src/lib.rs"
