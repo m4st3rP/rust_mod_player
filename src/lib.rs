@@ -61,7 +61,8 @@ pub mod song {
         pattern_positions: Vec<u8>,
         label: String,
         samples: Vec<Sample>,
-        patterns: Vec<Pattern>
+        patterns: Vec<Pattern>,
+        highest_pattern: u8
     }
 
     impl Song {
@@ -74,14 +75,18 @@ pub mod song {
                 Err(e) => {eprintln!("{}", e)},
             }
 
+            let pattern_positions = get_bytes_from_file(&file_vector, SONG_PATTERN_POSITIONS_START, SONG_PATTERN_POSITIONS_AMOUNT);
+            let highest_pattern = *pattern_positions.iter().max().unwrap();
+
             Song {
                 title: get_string_from_file(&file_vector, SONG_TITLE_START, SONG_TITLE_AMOUNT),
                 length: get_bytes_from_file(&file_vector, SONG_LENGTH_START, SONG_LENGTH_AMOUNT)[0],
                 special_byte: get_bytes_from_file(&file_vector, SONG_SPECIAL_BYTE_START, SONG_SPECIAL_BYTE_AMOUNT)[0],
-                pattern_positions: get_bytes_from_file(&file_vector, SONG_PATTERN_POSITIONS_START, SONG_PATTERN_POSITIONS_AMOUNT),
+                pattern_positions,
                 label: get_string_from_file(&file_vector, SONG_LABEL_START, SONG_LABEL_AMOUNT),
                 samples: get_samples(&file_vector),
-                patterns: get_patterns(&file_vector)
+                patterns: get_patterns(&file_vector, highest_pattern),
+                highest_pattern
             }
         }
 
@@ -105,10 +110,10 @@ pub mod song {
         vec
     }
 
-    fn get_patterns(file_vector: &[u8]) -> Vec<Pattern> {
+    fn get_patterns(file_vector: &[u8], max_pat: u8) -> Vec<Pattern> {
         let mut vec = Vec::new();
         for i in 0..PATTERN_AMOUNT {
-            vec.push(Pattern::new(&file_vector, i));
+            vec.push(Pattern::new(&file_vector, i, max_pat));
         }
         vec
     }
@@ -144,6 +149,7 @@ pub mod song {
                 Sample {
                     name: get_string_from_file(&file_vector, SAMPLE_NAME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_NAME_AMOUNT),
                     length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_LENGTH_AMOUNT)),
+
                     // only lower 4 bits are relevant, mask the higher ones away just in case TODO check if this is correct
                     finetune: (get_bytes_from_file(&file_vector, SAMPLE_FINETUNE_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_FINETUNE_AMOUNT)[0] & 0x0F << 4) as i8 >> 4,
                     volume: get_bytes_from_file(&file_vector, SAMPLE_VOLUME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_VOLUME_AMOUNT)[0],
@@ -177,15 +183,15 @@ pub mod song {
         }
 
         impl Pattern {
-            pub fn new(file_vector: &[u8], i: usize) -> Pattern {
-                let data = get_bytes_from_file(&file_vector, PATTERN_START+i*PATTERN_BYTE_AMOUNT, PATTERN_BYTE_AMOUNT);
+            pub fn new(file_vector: &[u8], i: usize, max_pat: u8) -> Pattern {
+                let data = get_bytes_from_file(&file_vector, PATTERN_START+i*PATTERN_BYTE_AMOUNT, PATTERN_BYTE_AMOUNT); // TODO find out why we sometimes get 0 as note_period
                 let mut notes = Vec::new();
 
                 let mut i = 0;
                 loop {
                     notes.push(Note::new(data[i], data[i+1], data[i+2], data[i+3]));
                     i += 4;
-                    if i > data.len() { // break out of the loop when we reached the end of data
+                    if i >= PATTERN_BYTE_AMOUNT { // break out of the loop when we reached the end of data
                         break;
                     }
                 }

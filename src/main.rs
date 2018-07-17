@@ -11,5 +11,5 @@ use synth::*;
 fn main() {
     let file = File::open("test.mod").expect("Could not find file"); // TODO temporary use only this file
     let song = Song::new(file);
-    //let oscillator = Oscillator::new(Sine::new(), );
+    //let synth = Synth::new(1,2);
 }
