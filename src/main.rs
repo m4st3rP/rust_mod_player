@@ -2,67 +2,54 @@
 #![allow(unused_variables)]
 
 extern crate rust_mod;
-extern crate cpal;
+extern crate rodio;
 
 use std::fs::File;
 use rust_mod::song::*;
+use rodio::Source;
+use rodio::Sink;
 
-use cpal::EventLoop;
-
+use std::{thread, time};
 
 fn main() {
     let file = File::open("test.mod").expect("Could not find file"); // TODO temporary use only this file
     let song = Song::new(file);
+    let pattern_positions = song.get_pattern_positions();
 
-    let device = cpal::default_output_device().expect("Failed to get default output device");
-    let format = device.default_output_format().expect("Failed to get default output format");
-    let event_loop = cpal::EventLoop::new();
-    let stream_id = event_loop.build_output_stream(&device, &format).unwrap();
-    event_loop.play_stream(stream_id.clone());
 
-    let sample_rate = format.sample_rate.0 as f32;
-    let mut sample_clock = 0f32;
+    let device = rodio::default_output_device().unwrap();
 
-    let mut freq = 200.0;
     let mut i = 0;
-    // Produce a sinusoid of maximum amplitude.
-    let mut next_value = || {
-            freq = song.get_patterns()[0].get_note(i).get_frequency();
-            i += 1;
-            if i > 255 {
-                i = 0;
-            }
-        sample_clock = (sample_clock + 1.0) % sample_rate;
-        (sample_clock * freq as f32 * 2.0 * 3.141592 / sample_rate).sin()
-    };
+    let mut pp = 0;
+    loop {
+        let mut freq1 = song.get_patterns()[pattern_positions[pp] as usize].get_note(i).get_frequency();
+        let mut freq2 = song.get_patterns()[pattern_positions[pp] as usize].get_note(i+1).get_frequency();
+        let mut freq3 = song.get_patterns()[pattern_positions[pp] as usize].get_note(i+2).get_frequency();
+        let mut freq4 = song.get_patterns()[pattern_positions[pp] as usize].get_note(i+3).get_frequency();
 
-    event_loop.run(move |_, data| {
-        match data {
-            cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::U16(mut buffer) } => {
-                for sample in buffer.chunks_mut(format.channels as usize) {
-                    let value = ((next_value() * 0.5 + 0.5) * std::u16::MAX as f32) as u16;
-                    for out in sample.iter_mut() {
-                        *out = value;
-                    }
-                }
-            },
-            cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::I16(mut buffer) } => {
-                for sample in buffer.chunks_mut(format.channels as usize) {
-                    let value = (next_value() * std::i16::MAX as f32) as i16;
-                    for out in sample.iter_mut() {
-                        *out = value;
-                    }
-                }
-            },
-            cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::F32(mut buffer) } => {
-                for sample in buffer.chunks_mut(format.channels as usize) {
-                    let value = next_value();
-                    for out in sample.iter_mut() {
-                        *out = value;
-                    }
-                }
-            },
-            _ => (),
+        let c1 = Sink::new(&device);
+        let s1 = rodio::source::SineWave::new(freq1 as u32 );
+
+        let c2 = Sink::new(&device);
+        let s2 = rodio::source::SineWave::new(freq2 as u32 );
+
+        let c3 = Sink::new(&device);
+        let s3 = rodio::source::SineWave::new(freq3 as u32 );
+
+        let c4 = Sink::new(&device);
+        let s4 = rodio::source::SineWave::new(freq4 as u32 );
+
+        c1.append(s1);
+        c2.append(s2);
+        c3.append(s3);
+        c4.append(s4);
+
+        let time = time::Duration::from_millis(480); // TODO get this number from song itself
+        thread::sleep(time);
+        i += 4;
+        if i > 255 {
+            i = 0;
+            pp += 1;
         }
-    });
+    }
 }
