@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Philipp Schwarz <schwarz_philipp@hotmail.de>"]
 
 [dependencies]
+synth = "0.11.0"
 
 [lib]
 name = "rust_mod"

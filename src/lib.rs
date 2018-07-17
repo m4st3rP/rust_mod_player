@@ -212,7 +212,8 @@ pub mod song {
             effect_data: u8,
             effect_command: u16,
             extended_command: Option<u8>,
-            musical_note: MusicalNotes
+            musical_note: MusicalNotes,
+            frequency: f64
         }
 
         #[derive(Debug)] // so we can print the enum
@@ -318,18 +319,62 @@ pub mod song {
                     _ => panic!("Musical note does not exist: {}", note_period)
                 };
 
+                let frequency = match musical_note {
+                    MusicalNotes::C1 => 32.7032,
+                    MusicalNotes::Csharp1 => 34.6478,
+                    MusicalNotes::D1 => 36.7081,
+                    MusicalNotes::Dsharp1 => 38.8909,
+                    MusicalNotes::E1 => 41.2034,
+                    MusicalNotes::F1 => 43.6535,
+                    MusicalNotes::Fsharp1 => 46.2493,
+                    MusicalNotes::G1 => 48.9994,
+                    MusicalNotes::Gsharp1 => 51.9131,
+                    MusicalNotes::A1 => 55.0,
+                    MusicalNotes::Asharp1 => 58.2705,
+                    MusicalNotes::B1 => 61.7354,
+                    MusicalNotes::C2 => 65.4064,
+                    MusicalNotes::Csharp2 => 69.2957,
+                    MusicalNotes::D2 => 73.4162,
+                    MusicalNotes::Dsharp2 => 77.7817,
+                    MusicalNotes::E2 => 82.4069,
+                    MusicalNotes::F2 => 87.3071,
+                    MusicalNotes::Fsharp2 => 92.4986,
+                    MusicalNotes::G2 => 97.9989,
+                    MusicalNotes::Gsharp2 => 103.826,
+                    MusicalNotes::A2 => 110.0,
+                    MusicalNotes::Asharp2 => 116.541,
+                    MusicalNotes::B2 => 123.471,
+                    MusicalNotes::C3 => 130.813,
+                    MusicalNotes::Csharp3 => 138.591,
+                    MusicalNotes::D3 => 146.832,
+                    MusicalNotes::Dsharp3 => 155.563,
+                    MusicalNotes::E3 => 164.814,
+                    MusicalNotes::F3 => 174.614,
+                    MusicalNotes::Fsharp3 => 184.997,
+                    MusicalNotes::G3 => 195.998,
+                    MusicalNotes::Gsharp3 => 207.652,
+                    MusicalNotes::A3 => 220.0,
+                    MusicalNotes::Asharp3 => 233.082,
+                    MusicalNotes::B3 => 246.942
+                };
+
                 Note {
                     sample_number,
                     note_period,
                     effect_data,
                     effect_command,
                     extended_command,
-                    musical_note
+                    musical_note,
+                    frequency
                 }
             }
 
             fn to_string(&self) -> String {
                 format!("Sample Number: {}, Note Period: {}, Effect Command: {}, Musical Note: {}", self.sample_number, self.note_period, self.effect_command, self.musical_note)
+            }
+
+            fn get_frequency(&self) -> f64 {
+                self.frequency
             }
         }
     }
