@@ -231,8 +231,7 @@ pub mod song {
             effect_data: u8,
             effect_command: u16,
             extended_command: Option<u8>,
-            musical_note: MusicalNotes,
-            frequency: f64
+            musical_note: MusicalNotes
         }
 
         #[derive(Debug)] // so we can print the enum
@@ -340,7 +339,22 @@ pub mod song {
                     //_ => panic!("Musical note does not exist: NP: {}, b1: {}, b2: {}, b3: {}, b4: {}", note_period, b1, b2, b3, b4)
                 };
 
-                let frequency = match musical_note {
+                Note {
+                    sample_number,
+                    note_period,
+                    effect_data,
+                    effect_command,
+                    extended_command,
+                    musical_note
+                }
+            }
+
+            fn to_string(&self) -> String {
+                format!("Sample Number: {}, Note Period: {}, Effect Command: {}, Musical Note: {}", self.sample_number, self.note_period, self.effect_command, self.musical_note)
+            }
+
+            pub fn get_frequency(&self) -> f64 {
+                match self.musical_note {
                     MusicalNotes::C1 => 32.7032,
                     MusicalNotes::Csharp1 => 34.6478,
                     MusicalNotes::D1 => 36.7081,
@@ -378,25 +392,7 @@ pub mod song {
                     MusicalNotes::Asharp3 => 233.082,
                     MusicalNotes::B3 => 246.942,
                     MusicalNotes::Quiet => 0.0
-                };
-
-                Note {
-                    sample_number,
-                    note_period,
-                    effect_data,
-                    effect_command,
-                    extended_command,
-                    musical_note,
-                    frequency
                 }
-            }
-
-            fn to_string(&self) -> String {
-                format!("Sample Number: {}, Note Period: {}, Effect Command: {}, Musical Note: {}", self.sample_number, self.note_period, self.effect_command, self.musical_note)
-            }
-
-            pub fn get_frequency(&self) -> f64 {
-                self.frequency
             }
         }
     }
