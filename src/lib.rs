@@ -3,7 +3,7 @@
 #![allow(unused_variables)]
 
 mod general {
-    pub fn get_bytes_from_file(file_vector: &[u8], start: usize, amount: usize) -> Vec<u8> {
+    pub fn get_bytes_from_file_u8(file_vector: &[u8], start: usize, amount: usize) -> Vec<u8> {
         let mut ret = Vec::new();
         for i in start..start+amount {
             ret.push(match file_vector.get(i) {
@@ -14,9 +14,20 @@ mod general {
         ret
     }
 
+    pub fn get_bytes_from_file_i8(file_vector: &[u8], start: usize, amount: usize) -> Vec<i8> {
+        let mut ret = Vec::new();
+        for i in start..start+amount {
+            ret.push(match file_vector.get(i) {
+                Some(t) => *t as i8,
+                None => panic!("Incorrect file at byte: {}", i)
+            })
+        }
+        ret
+    }
+
     pub fn get_string_from_file(file_vector: &[u8], start: usize, amount: usize) -> String {
         let mut string = String::new();
-        for byte in get_bytes_from_file(file_vector, start, amount) {
+        for byte in get_bytes_from_file_u8(file_vector, start, amount) {
             string.push(byte as char);
         }
         string.trim().to_string()
@@ -51,22 +62,30 @@ pub mod song {
     const SONG_LABEL_START: usize = 1080;
     const SONG_LABEL_AMOUNT: usize = 4;
 
-    const PATTERN_AMOUNT: usize = 90; // TODO need to find out dynamically, can go up to 128, test file has 90
     const SAMPLE_AMOUNT: usize = 31;
 
     pub struct Song {
+        /// name of the song
         title: String,
+        /// number of positions
         length: u8,
-        special_byte: u8,
+        /// highest position number that is possible
+        max_possible_position: u8,
+        /// a list of position numbers to play in that order
         pattern_positions: Vec<u8>,
+        /// indicator label
         label: String,
+        /// list of all samples
         samples: Vec<Sample>,
+        /// list of all patterns
         patterns: Vec<Pattern>,
-        highest_pattern: u8
+        /// highest actual pattern position
+        highest_pattern_pos: u8
     }
 
     impl Song {
         pub fn new(file: File) -> Song {
+            // first read the file into a vector
             let mut buf_reader = BufReader::new(file); // TODO is a buffered reader even useful in this situation?
             let mut file_vector: Vec<u8> = Vec::new();
 
@@ -75,18 +94,18 @@ pub mod song {
                 Err(e) => {eprintln!("{}", e)},
             }
 
-            let pattern_positions = get_bytes_from_file(&file_vector, SONG_PATTERN_POSITIONS_START, SONG_PATTERN_POSITIONS_AMOUNT);
+            let pattern_positions = get_bytes_from_file_u8(&file_vector, SONG_PATTERN_POSITIONS_START, SONG_PATTERN_POSITIONS_AMOUNT);
             let highest_pattern = *pattern_positions.iter().max().unwrap();
 
             Song {
                 title: get_string_from_file(&file_vector, SONG_TITLE_START, SONG_TITLE_AMOUNT),
-                length: get_bytes_from_file(&file_vector, SONG_LENGTH_START, SONG_LENGTH_AMOUNT)[0],
-                special_byte: get_bytes_from_file(&file_vector, SONG_SPECIAL_BYTE_START, SONG_SPECIAL_BYTE_AMOUNT)[0],
+                length: get_bytes_from_file_u8(&file_vector, SONG_LENGTH_START, SONG_LENGTH_AMOUNT)[0],
+                max_possible_position: get_bytes_from_file_u8(&file_vector, SONG_SPECIAL_BYTE_START, SONG_SPECIAL_BYTE_AMOUNT)[0],
                 pattern_positions,
                 label: get_string_from_file(&file_vector, SONG_LABEL_START, SONG_LABEL_AMOUNT),
-                samples: get_samples(&file_vector),
-                patterns: get_patterns(&file_vector, highest_pattern),
-                highest_pattern
+                samples: get_samples_from_file(&file_vector, highest_pattern),
+                patterns: get_patterns_from_file(&file_vector, highest_pattern, highest_pattern as usize),
+                highest_pattern_pos: highest_pattern
             }
         }
 
@@ -94,7 +113,7 @@ pub mod song {
             println!("Song");
             println!("Title: {}", self.title);
             println!("Length: {}", self.length);
-            println!("Special Byte: {}", self.special_byte);
+            println!("Special Byte: {}", self.max_possible_position);
             println!("Patter Positions Length: {}", self.pattern_positions.len());
             println!("Label: {}", self.label);
             println!("Samples Length: {}", self.samples.len());
@@ -108,19 +127,23 @@ pub mod song {
         pub fn get_pattern_positions(&self) -> &Vec<u8> {
             &self.pattern_positions
         }
+
+        pub fn get_samples(&self) -> &Vec<Sample> {
+            &self.samples
+        }
     }
 
-    fn get_samples(file_vector: &[u8]) -> Vec<Sample> {
+    fn get_samples_from_file(file_vector: &[u8], highest_pattern_pos: u8) -> Vec<Sample> {
         let mut vec = Vec::new();
         for i in 0..SAMPLE_AMOUNT {
-            vec.push(Sample::new(&file_vector, i));
+            vec.push(Sample::new(&file_vector, i, highest_pattern_pos));
         }
         vec
     }
 
-    fn get_patterns(file_vector: &[u8], max_pat: u8) -> Vec<Pattern> {
+    fn get_patterns_from_file(file_vector: &[u8], max_pat: u8, amount: usize) -> Vec<Pattern> {
         let mut vec = Vec::new();
-        for i in 0..PATTERN_AMOUNT {
+        for i in 0..amount {
             vec.push(Pattern::new(&file_vector, i, max_pat));
         }
         vec
@@ -128,6 +151,8 @@ pub mod song {
 
     mod sample {
         use general::*;
+        use song::pattern::PATTERN_BYTE_AMOUNT;
+        use song::pattern::PATTERN_START;
 
         const SAMPLE_BYTE_AMOUNT: usize = 30;
         const SAMPLE_NAME_START: usize = 20;
@@ -144,25 +169,34 @@ pub mod song {
         const SAMPLE_REPEAT_LENGTH_AMOUNT: usize = 2;
 
         pub struct Sample {
+            /// name of the sample
             name: String,
+            /// length of the sample in WORDS
             length: u16,
+            /// 4 bit signed number
             finetune: i8,
+            /// between 0 (silent) and 64 (0db)
             volume: u8,
+            /// sample repeat start in WORDS
             repeat_point: u16,
-            repeat_length: u16
+            /// sample repeat length in WORDS, 1 means no loop, Otherwise, the sample plays from its start to sample repeat start + sample repeat length, then loops back to sample repeat start, looping endlessly
+            repeat_length: u16,
+            // actual 8 bit signed PCM data
+            data: Vec<i8>
         }
 
         impl Sample {
-            pub fn new(file_vector: &[u8], i: usize) -> Sample {
+            pub fn new(file_vector: &[u8], i: usize, highest_pattern_pos: u8) -> Sample {
+                let length = calculate_u16_from_two_u8(&get_bytes_from_file_u8(&file_vector, SAMPLE_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_LENGTH_AMOUNT));
                 Sample {
                     name: get_string_from_file(&file_vector, SAMPLE_NAME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_NAME_AMOUNT),
-                    length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_LENGTH_AMOUNT)),
-
+                    length,
                     // only lower 4 bits are relevant, mask the higher ones away just in case TODO check if this is correct
-                    finetune: (get_bytes_from_file(&file_vector, SAMPLE_FINETUNE_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_FINETUNE_AMOUNT)[0] & 0x0F << 4) as i8 >> 4,
-                    volume: get_bytes_from_file(&file_vector, SAMPLE_VOLUME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_VOLUME_AMOUNT)[0],
-                    repeat_point: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_POINT_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_POINT_AMOUNT)),
-                    repeat_length: calculate_u16_from_two_u8(&get_bytes_from_file(&file_vector, SAMPLE_REPEAT_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_LENGTH_AMOUNT)),
+                    finetune: (get_bytes_from_file_u8(&file_vector, SAMPLE_FINETUNE_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_FINETUNE_AMOUNT)[0] & 0x0F << 4) as i8 >> 4,
+                    volume: get_bytes_from_file_u8(&file_vector, SAMPLE_VOLUME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_VOLUME_AMOUNT)[0],
+                    repeat_point: calculate_u16_from_two_u8(&get_bytes_from_file_u8(&file_vector, SAMPLE_REPEAT_POINT_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_POINT_AMOUNT)),
+                    repeat_length: calculate_u16_from_two_u8(&get_bytes_from_file_u8(&file_vector, SAMPLE_REPEAT_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_LENGTH_AMOUNT)),
+                    data: get_bytes_from_file_i8(&file_vector, highest_pattern_pos as usize * PATTERN_BYTE_AMOUNT+PATTERN_START, length as usize * 2) // *2 because length is in words and we need bytes
                 }
             }
 
@@ -182,23 +216,25 @@ pub mod song {
         use general::*;
         use song::note::*;
 
-        const PATTERN_BYTE_AMOUNT: usize = 1024;
-        const PATTERN_START: usize = 1084;
+        pub const PATTERN_BYTE_AMOUNT: usize = 1024;
+        pub const PATTERN_START: usize = 1084;
 
         pub struct Pattern {
+            /// raw note data, one note consists of 4 bytes and there is one note per channel
             data: Vec<u8>,
+            /// the notes in the same order they are in data but calculated
             notes: Vec<Note>
         }
 
         impl Pattern {
             pub fn new(file_vector: &[u8], i: usize, max_pat: u8) -> Pattern {
                 // a pattern consists of 1024 bytes
-                let data = get_bytes_from_file(&file_vector, PATTERN_START+i*PATTERN_BYTE_AMOUNT, PATTERN_BYTE_AMOUNT);
+                let data = get_bytes_from_file_u8(&file_vector, PATTERN_START+i*PATTERN_BYTE_AMOUNT, PATTERN_BYTE_AMOUNT);
                 let mut notes = Vec::new();
 
                 let mut i = 0;
                 loop {
-                    notes.push(Note::new(data[i], data[i+1], data[i+2], data[i+3])); // TODO find out why we sometimes get 0 as note_period, maybe this is supposed to be like this?
+                    notes.push(Note::new(data[i], data[i+1], data[i+2], data[i+3]));
                     i += 4;
                     if i >= PATTERN_BYTE_AMOUNT { // break out of the loop when we reached the end of data
                         break;
@@ -272,7 +308,7 @@ pub mod song {
             A3,
             Asharp3,
             B3,
-            Quiet
+            Silent
         }
 
         impl fmt::Display for MusicalNotes {
@@ -335,8 +371,7 @@ pub mod song {
                     127 => MusicalNotes::A3,
                     120 => MusicalNotes::Asharp3,
                     113 => MusicalNotes::B3,
-                    _   => MusicalNotes::Quiet
-                    //_ => panic!("Musical note does not exist: NP: {}, b1: {}, b2: {}, b3: {}, b4: {}", note_period, b1, b2, b3, b4)
+                    _   => MusicalNotes::Silent
                 };
 
                 Note {
@@ -391,8 +426,12 @@ pub mod song {
                     MusicalNotes::A3 => 220.0,
                     MusicalNotes::Asharp3 => 233.082,
                     MusicalNotes::B3 => 246.942,
-                    MusicalNotes::Quiet => 0.0
+                    MusicalNotes::Silent => 0.0
                 }
+            }
+
+            pub fn get_sample_rate(&self) -> f64 {
+                7093789.2 as f64 / (self.note_period as f64 * 2.0) // clock rate of 7093789.2 Hz for PAL machines, 7159090.5 Hz for NTSC
             }
         }
     }
