@@ -95,16 +95,17 @@ pub mod song {
             }
 
             let pattern_positions = get_bytes_from_file_u8(&file_vector, SONG_PATTERN_POSITIONS_START, SONG_PATTERN_POSITIONS_AMOUNT);
-            let highest_pattern = *pattern_positions.iter().max().unwrap();
+            let highest_pattern = *pattern_positions.iter().max().unwrap(); //TODO change this back to unmutable
+            let length = get_bytes_from_file_u8(&file_vector, SONG_LENGTH_START, SONG_LENGTH_AMOUNT)[0];
 
             Song {
                 title: get_string_from_file(&file_vector, SONG_TITLE_START, SONG_TITLE_AMOUNT),
-                length: get_bytes_from_file_u8(&file_vector, SONG_LENGTH_START, SONG_LENGTH_AMOUNT)[0],
+                length,
                 max_possible_position: get_bytes_from_file_u8(&file_vector, SONG_SPECIAL_BYTE_START, SONG_SPECIAL_BYTE_AMOUNT)[0],
                 pattern_positions,
                 label: get_string_from_file(&file_vector, SONG_LABEL_START, SONG_LABEL_AMOUNT),
                 samples: get_samples_from_file(&file_vector, highest_pattern),
-                patterns: get_patterns_from_file(&file_vector, highest_pattern, highest_pattern as usize),
+                patterns: get_patterns_from_file(&file_vector, highest_pattern, length as usize),
                 highest_pattern_pos: highest_pattern
             }
         }
@@ -118,6 +119,14 @@ pub mod song {
             println!("Label: {}", self.label);
             println!("Samples Length: {}", self.samples.len());
             println!("Patterns Length: {}", self.patterns.len());
+            println!("Highest Pattern Position: {}", self.highest_pattern_pos);
+        }
+
+        pub fn print_pattern_positions(&self) {
+            print!("Pattern Positions: ");
+            for i in &self.pattern_positions {
+                print!("{}, ", *i);
+            }
         }
 
         pub fn get_patterns(&self) -> &Vec<Pattern> {
@@ -134,9 +143,12 @@ pub mod song {
     }
 
     fn get_samples_from_file(file_vector: &[u8], highest_pattern_pos: u8) -> Vec<Sample> {
+        let mut sample_offset = 0;
         let mut vec = Vec::new();
         for i in 0..SAMPLE_AMOUNT {
-            vec.push(Sample::new(&file_vector, i, highest_pattern_pos));
+            let new_sample = Sample::new(&file_vector, i, highest_pattern_pos, sample_offset);
+            sample_offset += *new_sample.get_length() as usize * 2; // * 2 because the length is in words
+            vec.push(new_sample);
         }
         vec
     }
@@ -149,7 +161,7 @@ pub mod song {
         vec
     }
 
-    mod sample {
+    mod sample { // also called instrument
         use general::*;
         use song::pattern::PATTERN_BYTE_AMOUNT;
         use song::pattern::PATTERN_START;
@@ -179,14 +191,14 @@ pub mod song {
             volume: u8,
             /// sample repeat start in WORDS
             repeat_point: u16,
-            /// sample repeat length in WORDS, 1 means no loop, Otherwise, the sample plays from its start to sample repeat start + sample repeat length, then loops back to sample repeat start, looping endlessly
+            /// sample repeat length in WORDS, 1 means no loop, otherwise the sample plays from its start to sample repeat start + sample repeat length then loops back to sample repeat start looping endlessly
             repeat_length: u16,
-            // actual 8 bit signed PCM data
+            /// actual 8 bit signed PCM data
             data: Vec<i8>
         }
 
         impl Sample {
-            pub fn new(file_vector: &[u8], i: usize, highest_pattern_pos: u8) -> Sample {
+            pub fn new(file_vector: &[u8], i: usize, highest_pattern_pos: u8, sample_offset: usize) -> Sample {
                 let length = calculate_u16_from_two_u8(&get_bytes_from_file_u8(&file_vector, SAMPLE_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_LENGTH_AMOUNT));
                 Sample {
                     name: get_string_from_file(&file_vector, SAMPLE_NAME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_NAME_AMOUNT),
@@ -196,7 +208,7 @@ pub mod song {
                     volume: get_bytes_from_file_u8(&file_vector, SAMPLE_VOLUME_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_VOLUME_AMOUNT)[0],
                     repeat_point: calculate_u16_from_two_u8(&get_bytes_from_file_u8(&file_vector, SAMPLE_REPEAT_POINT_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_POINT_AMOUNT)),
                     repeat_length: calculate_u16_from_two_u8(&get_bytes_from_file_u8(&file_vector, SAMPLE_REPEAT_LENGTH_START+i*SAMPLE_BYTE_AMOUNT, SAMPLE_REPEAT_LENGTH_AMOUNT)),
-                    data: get_bytes_from_file_i8(&file_vector, highest_pattern_pos as usize * PATTERN_BYTE_AMOUNT+PATTERN_START, length as usize * 2) // *2 because length is in words and we need bytes
+                    data: get_sample_data(&file_vector, highest_pattern_pos as usize * PATTERN_BYTE_AMOUNT+PATTERN_START+sample_offset, length as usize)
                 }
             }
 
@@ -209,6 +221,18 @@ pub mod song {
                 println!("Repeat Point: {}", self.repeat_point);
                 println!("Repeat Length: {}", self.repeat_length);
             }
+
+            pub fn get_length(&self) -> &u16 {
+                &self.length
+            }
+        }
+
+        fn get_sample_data(file_vector: &[u8], start: usize, length: usize) -> Vec<i8> {
+            let ret = Vec::new();
+            if start != 0 && length != 0 {
+                get_bytes_from_file_i8(&file_vector, start, length * 2); // *2 because length is in words and we need bytes
+            }
+            ret
         }
     }
 
@@ -260,6 +284,9 @@ pub mod song {
 
     pub mod note {
         use std::fmt;
+
+        const CLOCK_RATE_PAL: f64 = 7093789.2;
+        const CLOCK_RATE_NTSC: f64 = 7159090.5;
 
         pub struct Note {
             sample_number: u8,
@@ -431,7 +458,7 @@ pub mod song {
             }
 
             pub fn get_sample_rate(&self) -> f64 {
-                7093789.2 as f64 / (self.note_period as f64 * 2.0) // clock rate of 7093789.2 Hz for PAL machines, 7159090.5 Hz for NTSC
+                CLOCK_RATE_PAL / (self.note_period as f64 * 2.0) // for some reasons f64::from does not work
             }
         }
     }

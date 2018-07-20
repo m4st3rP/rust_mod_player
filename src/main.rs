@@ -12,6 +12,8 @@ fn main() {
     let song = Song::new(file);
     let pattern_positions = song.get_pattern_positions();
 
-    song.get_samples()[5].print_debug_info();
+    song.print_debug_info();
+    song.print_pattern_positions();
+    //song.get_samples()[0].print_debug_info();
 
 }
